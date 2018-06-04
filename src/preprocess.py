@@ -120,27 +120,27 @@ def build_model_input():
 
     del data['CODE_GENDER_XNA'], data['NAME_INCOME_TYPE_Maternity leave'], data['NAME_FAMILY_STATUS_Unknown']
 
-    correlated_features = ["AMT_GOODS_PRICE", "APARTMENTS_MEDI", "APARTMENTS_MODE",
-                           "BASEMENTAREA_MEDI", "BASEMENTAREA_MODE", "COMMONAREA_MEDI",
-                           "COMMONAREA_MODE", "ELEVATORS_MEDI", "ELEVATORS_MODE",
-                           "ENTRANCES_MEDI", "ENTRANCES_MODE", "FLOORSMAX_MEDI",
-                           "FLOORSMAX_MODE", "FLOORSMIN_MEDI", "FLOORSMIN_MODE",
-                           "LANDAREA_MEDI", "LANDAREA_MODE", "LIVINGAPARTMENTS_AVG",
-                           "LIVINGAPARTMENTS_MEDI", "LIVINGAPARTMENTS_MODE", "LIVINGAREA_AVG",
-                           "LIVINGAREA_MEDI", "LIVINGAREA_MODE", "NONLIVINGAPARTMENTS_MEDI",
-                           "NONLIVINGAPARTMENTS_MODE", "NONLIVINGAREA_MEDI", "NONLIVINGAREA_MODE",
-                           "OBS_60_CNT_SOCIAL_CIRCLE", "REGION_RATING_CLIENT_W_CITY", "TOTALAREA_MODE",
-                           "YEARS_BEGINEXPLUATATION_MEDI", "YEARS_BEGINEXPLUATATION_MODE",
-                           "YEARS_BUILD_MEDI", "YEARS_BUILD_MODE",
-                           # Test data constant values of 0
-                           "FLAG_DOCUMENT_10", "FLAG_DOCUMENT_12", "FLAG_DOCUMENT_13",
-                           "FLAG_DOCUMENT_14", "FLAG_DOCUMENT_15", "FLAG_DOCUMENT_16",
-                           "FLAG_DOCUMENT_17", "FLAG_DOCUMENT_19", "FLAG_DOCUMENT_2",
-                           "FLAG_DOCUMENT_20", "FLAG_DOCUMENT_21",
-                           ]
-
-    for f_ in correlated_features:
-        del data[f_], test[f_]
+    # correlated_features = ["AMT_GOODS_PRICE", "APARTMENTS_MEDI", "APARTMENTS_MODE",
+    #                        "BASEMENTAREA_MEDI", "BASEMENTAREA_MODE", "COMMONAREA_MEDI",
+    #                        "COMMONAREA_MODE", "ELEVATORS_MEDI", "ELEVATORS_MODE",
+    #                        "ENTRANCES_MEDI", "ENTRANCES_MODE", "FLOORSMAX_MEDI",
+    #                        "FLOORSMAX_MODE", "FLOORSMIN_MEDI", "FLOORSMIN_MODE",
+    #                        "LANDAREA_MEDI", "LANDAREA_MODE", "LIVINGAPARTMENTS_AVG",
+    #                        "LIVINGAPARTMENTS_MEDI", "LIVINGAPARTMENTS_MODE", "LIVINGAREA_AVG",
+    #                        "LIVINGAREA_MEDI", "LIVINGAREA_MODE", "NONLIVINGAPARTMENTS_MEDI",
+    #                        "NONLIVINGAPARTMENTS_MODE", "NONLIVINGAREA_MEDI", "NONLIVINGAREA_MODE",
+    #                        "OBS_60_CNT_SOCIAL_CIRCLE", "REGION_RATING_CLIENT_W_CITY", "TOTALAREA_MODE",
+    #                        "YEARS_BEGINEXPLUATATION_MEDI", "YEARS_BEGINEXPLUATATION_MODE",
+    #                        "YEARS_BUILD_MEDI", "YEARS_BUILD_MODE",
+    #                        # Test data constant values of 0
+    #                        "FLAG_DOCUMENT_10", "FLAG_DOCUMENT_12", "FLAG_DOCUMENT_13",
+    #                        "FLAG_DOCUMENT_14", "FLAG_DOCUMENT_15", "FLAG_DOCUMENT_16",
+    #                        "FLAG_DOCUMENT_17", "FLAG_DOCUMENT_19", "FLAG_DOCUMENT_2",
+    #                        "FLAG_DOCUMENT_20", "FLAG_DOCUMENT_21",
+    #                        ]
+    #
+    # for f_ in correlated_features:
+    #     del data[f_], test[f_]
 
     print("Shapes: ", data.shape, test.shape)
 
