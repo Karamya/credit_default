@@ -107,17 +107,18 @@ def build_model_input():
     print("Reading application train and test data")
     data = pd.read_csv("../data/application_train.csv")
     test = pd.read_csv("../data/application_test.csv")
-    print("Shapes: ", data.shape, test.shape)
 
     y = data['TARGET']
     ids = data['SK_ID_CURR']
     del data['TARGET']
 
     categorical_features = [f for f in data.columns if data[f].dtype == 'object']
+    # one-hot encoding of categorical features
+    data = pd.get_dummies(data, columns=categorical_features)
+    test = pd.get_dummies(test, columns=categorical_features)
+    del data['CODE_GENDER_XNA'], data['NAME_INCOME_TYPE_Maternity leave'], data['NAME_FAMILY_STATUS_Unknown']
+    print("Shapes: ", data.shape, test.shape)
 
-    for f_ in categorical_features:
-        data[f_], indexer = pd.factorize(data[f_])
-        test[f_] = indexer.get_indexer(test[f_])
 
     print('Merging all datasets...')
 
@@ -138,6 +139,8 @@ def build_model_input():
 
     del avg_bureau, avg_prev, avg_pos, avg_cc_bal, avg_inst
     gc.collect()
+
+
 
     return data, test, y, ids
 

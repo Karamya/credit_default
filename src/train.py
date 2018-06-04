@@ -76,7 +76,7 @@ if __name__=="__main__":
     #Build model inputs
     data, test, y, ids = build_model_input()
     #Creat Folds
-    folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=123)  # TODO: try stratified split
+    folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=123)
     #Train model and get oof and test predictions
     oof_preds, df_oof_preds, test_preds, importances, score = train_model(data, test, y, folds)
     # Save test predictions
