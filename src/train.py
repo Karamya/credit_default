@@ -23,7 +23,7 @@ def train_model(data_, test_, y_, folds_):
 
         clf = LGBMClassifier(
             n_estimators=10000,
-            learning_rate=0.03,
+            learning_rate=0.01,
             num_leaves=30,
             colsample_bytree=.9,
             subsample=0.9,
