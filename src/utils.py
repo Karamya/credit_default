@@ -4,7 +4,7 @@ from sklearn.metrics import roc_auc_score, precision_recall_curve, roc_curve, av
 import numpy as np
 from datetime import datetime
 
-def display_importances(feature_importance_df_):
+def display_importances(feature_importance_df_, vis_file):
     # Plot feature importances
     cols = feature_importance_df_[["feature", "importance"]].groupby("feature").mean().sort_values(
         by="importance", ascending=False)[:50].index
@@ -16,10 +16,10 @@ def display_importances(feature_importance_df_):
                 data=best_features.sort_values(by="importance", ascending=False))
     plt.title('LightGBM Features (avg over folds)')
     plt.tight_layout()
-    plt.savefig('../visualization/lgbm_importances.png')
+    plt.savefig(vis_file)
 
 
-def display_roc_curve(y_, oof_preds_, folds_idx_):
+def display_roc_curve(y_, oof_preds_, folds_idx_, vis_file):
     # Plot ROC curves
     plt.figure(figsize=(6, 6))
     scores = []
@@ -45,10 +45,10 @@ def display_roc_curve(y_, oof_preds_, folds_idx_):
     plt.legend(loc="lower right")
     plt.tight_layout()
 
-    plt.savefig('../visualization/roc_curve.png')
+    plt.savefig(vis_file)
 
 
-def display_precision_recall(y_, oof_preds_, folds_idx_):
+def display_precision_recall(y_, oof_preds_, folds_idx_, vis_file):
     # Plot ROC curves
     plt.figure(figsize=(6, 6))
 
@@ -63,7 +63,7 @@ def display_precision_recall(y_, oof_preds_, folds_idx_):
     precision, recall, thresholds = precision_recall_curve(y_, oof_preds_)
     score = average_precision_score(y_, oof_preds_)
     plt.plot(precision, recall, color='b',
-             label='Avg ROC (AUC = %0.4f $\pm$ %0.4f)' % (score, np.std(scores)),
+             label='Avg precision score (precision = %0.4f $\pm$ %0.4f)' % (score, np.std(scores)),
              lw=2, alpha=.8)
 
     plt.xlim([-0.05, 1.05])
@@ -74,4 +74,4 @@ def display_precision_recall(y_, oof_preds_, folds_idx_):
     plt.legend(loc="best")
     plt.tight_layout()
 
-    plt.savefig('../visualization/recall_precision_curve.png')
+    plt.savefig(vis_file)

@@ -8,7 +8,7 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score
 from datetime import datetime
 
-def train_model(data_, test_, y_, folds_):
+def train_model(data_, test_, y_, folds_, categorical_features_):
 
     oof_preds = np.zeros(data_.shape[0])
     sub_preds = np.zeros(test_.shape[0])
@@ -26,7 +26,7 @@ def train_model(data_, test_, y_, folds_):
             learning_rate=0.01,
             num_leaves=30,
             colsample_bytree=.9,
-            subsample=0.9,
+            subsample=0.5,
             max_depth=7,
             reg_alpha=.04,
             reg_lambda=.07,
@@ -75,10 +75,11 @@ if __name__=="__main__":
 
     #Build model inputs
     data, test, y, ids = build_model_input()
+    categorical_features = [f for f in data.columns if data[f].dtype == 'object']
     #Creat Folds
     folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=123)
     #Train model and get oof and test predictions
-    oof_preds, df_oof_preds, test_preds, importances, score = train_model(data, test, y, folds)
+    oof_preds, df_oof_preds, test_preds, importances, score = train_model(data, test, y, folds, categorical_features)
     # Save test predictions
     now = datetime.now()
     score = str(round(score, 6)).replace('.', '')
@@ -88,6 +89,7 @@ if __name__=="__main__":
     df_oof_preds.to_csv(oof_file, index=False)
     # Display a few graphs
     folds_idx = [(trn_idx, val_idx) for trn_idx, val_idx in folds.split(data, y)]
-    display_importances(feature_importance_df_=importances)
-    display_roc_curve(y_=y, oof_preds_=oof_preds, folds_idx_=folds_idx)
-    display_precision_recall(y_=y, oof_preds_=oof_preds, folds_idx_=folds_idx)
+    vis_file = '../visualization/' + score + '_' + str(now.strftime('%Y-%m-%d-%H-%M'))
+    display_importances(feature_importance_df_=importances, vis_file= vis_file + "_feature_importances.png")
+    display_roc_curve(y_=y, oof_preds_=oof_preds, folds_idx_=folds_idx, vis_file=vis_file + "_roc_curve.png")
+    display_precision_recall(y_=y, oof_preds_=oof_preds, folds_idx_=folds_idx, vis_file=vis_file + "_precision_recall.png")

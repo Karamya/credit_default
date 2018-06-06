@@ -2,6 +2,7 @@
 
 import pandas as pd
 import numpy as np
+from credit_card_balance import get_credit_balance_features
 import gc
 
 gc.enable()
@@ -76,19 +77,7 @@ def build_model_input():
     gc.collect()
 
     print('Reading credit card balance...')
-    cc_bal = pd.read_csv('../data/credit_card_balance.csv')
-
-    print('One-hot encoding of categorical feature')
-    cc_bal = pd.get_dummies(cc_bal, columns=["NAME_CONTRACT_STATUS"])
-
-    nb_prevs = cc_bal[['SK_ID_CURR', 'SK_ID_PREV']].groupby('SK_ID_CURR').count()
-    cc_bal['SK_ID_PREV'] = cc_bal['SK_ID_CURR'].map(nb_prevs['SK_ID_PREV'])
-
-    print('Compute average')
-    avg_cc_bal = cc_bal.groupby('SK_ID_CURR').mean()
-    avg_cc_bal.columns = ['cc_bal_' + f_ for f_ in avg_cc_bal.columns]
-
-    del cc_bal, nb_prevs
+    avg_cc_bal = get_credit_balance_features()
     gc.collect()
 
     print('Reading intallments payments')
@@ -113,8 +102,7 @@ def build_model_input():
     del data['TARGET']
 
     categorical_features = [f for f in data.columns if data[f].dtype == 'object']
-    print("Categorical Features :", categorical_features)
-    # one-hot encoding of categorical features
+    #one-hot encoding of categorical features
     data = pd.get_dummies(data, columns=categorical_features)
     test = pd.get_dummies(test, columns=categorical_features)
 
@@ -142,7 +130,7 @@ def build_model_input():
     # for f_ in correlated_features:
     #     del data[f_], test[f_]
 
-    print("Shapes: ", data.shape, test.shape)
+
 
     print('Merging all datasets...')
 
@@ -163,6 +151,8 @@ def build_model_input():
 
     del avg_bureau, avg_prev, avg_pos, avg_cc_bal, avg_inst
     gc.collect()
+
+    print("Shapes: ", data.shape, test.shape)
 
     return data, test, y, ids
 
