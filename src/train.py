@@ -27,7 +27,7 @@ def train_model(data_, test_, y_, folds_, categorical_features_):
             num_leaves=30,
             colsample_bytree=.9,
             subsample=0.5,
-            max_depth=7,
+            max_depth=2,
             reg_alpha=.04,
             reg_lambda=.07,
             min_split_gain=.02,
@@ -83,13 +83,13 @@ if __name__=="__main__":
     # Save test predictions
     now = datetime.now()
     score = str(round(score, 6)).replace('.', '')
-    sub_file = '../predictions/submission_5x-average-LGB-run-01-v1_' + score + '_' + str(now.strftime('%Y-%m-%d-%H-%M')) + '.csv'
+    sub_file = '../predictions/without_ext_source_submission_5x-average-LGB-run-01-v1_' + score + '_' + str(now.strftime('%Y-%m-%d-%H-%M')) + '.csv'
     test_preds.to_csv(sub_file, index=False)
-    oof_file = '../predictions/train_5x-LGB-run-01-v1-oof_' + score + '_' + str(now.strftime('%Y-%m-%d-%H-%M')) + '.csv'
+    oof_file = '../predictions/without_ext_source_train_5x-LGB-run-01-v1-oof_' + score + '_' + str(now.strftime('%Y-%m-%d-%H-%M')) + '.csv'
     df_oof_preds.to_csv(oof_file, index=False)
     # Display a few graphs
     folds_idx = [(trn_idx, val_idx) for trn_idx, val_idx in folds.split(data, y)]
     vis_file = '../visualization/' + score + '_' + str(now.strftime('%Y-%m-%d-%H-%M'))
-    display_importances(feature_importance_df_=importances, vis_file= vis_file + "_feature_importances.png")
-    display_roc_curve(y_=y, oof_preds_=oof_preds, folds_idx_=folds_idx, vis_file=vis_file + "_roc_curve.png")
-    display_precision_recall(y_=y, oof_preds_=oof_preds, folds_idx_=folds_idx, vis_file=vis_file + "_precision_recall.png")
+    display_importances(feature_importance_df_=importances, vis_file= vis_file + "_feature_importances_without_ext_source.png")
+    display_roc_curve(y_=y, oof_preds_=oof_preds, folds_idx_=folds_idx, vis_file=vis_file + "_roc_curve_without_ext_source.png")
+    display_precision_recall(y_=y, oof_preds_=oof_preds, folds_idx_=folds_idx, vis_file=vis_file + "_precision_recall_without_ext_source.png")

@@ -17,7 +17,7 @@ def f_dpd(DPD):
 
 
 # % of minimum payments missed
-def f_pay(min_pay, total_pay):
+def f_pay(min_pay, total_pay): 
     M = min_pay.tolist()
     T = total_pay.tolist()
     P = len(M)
@@ -29,9 +29,9 @@ def f_pay(min_pay, total_pay):
     return (100 * c) / P
 
 
-def get_credit_balance_features():
+def get_credit_balance_features(num_rows=None, nan_as_category=True):
     print('Reading credit card balance...')
-    cc_bal = pd.read_csv('../data/credit_card_balance.csv')
+    cc_bal = pd.read_csv('../data/credit_card_balance.csv', nrows=num_rows)
 
     # https://www.kaggle.com/shanth84/credit-card-balance-feature-engineering
     # No of loans per customer
