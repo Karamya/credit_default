@@ -1,25 +1,39 @@
 from lightgbm import LGBMClassifier
-from preprocess import build_model_input
 from utils import display_importances, display_precision_recall, display_roc_curve
 import gc
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, KFold
 import numpy as np
 import pandas as pd
 from sklearn.metrics import roc_auc_score
 from datetime import datetime
 
-def train_model(data_, test_, y_, folds_, categorical_features_):
+def kfold_lightgbm(df, num_folds=5, stratified=False, debug=False):
 
-    oof_preds = np.zeros(data_.shape[0])
-    sub_preds = np.zeros(test_.shape[0])
+    # Divide into train/valid and text data
+
+    train_df = df[df['TARGET'].notnull()]
+    test_df = df[df['TARGET'].isnull()]
+    ids = train_df['SK_ID_CURR']
+
+    print('Starting Lightgbm. Train shape: {}, test shape: {}'.format(train_df.shape, test_df.shape))
+    del df
+    gc.collect()
+
+    if stratified:
+        folds = StratifiedKFold(n_splits=num_folds, shuffle=True, random_state=321)
+    else:
+        folds = KFold(n_splits=num_folds, shuffle=True, random_state=123)
+
+    # Create arrays and dataframes to store results
+    oof_preds = np.zeros(train_df.shape[0])
+    sub_preds = np.zeros(test_df.shape[0])
 
     feature_importance_df = pd.DataFrame()
+    feats = [f for f in train_df.columns if f not in ['TARGET','SK_ID_CURR', 'SK_ID_BUREAU', 'SK_ID_PREV', 'index']]
 
-    feats = [f for f in data_.columns if f not in ['SK_ID_CURR']]
-
-    for n_fold, (trn_idx, val_idx) in enumerate(folds_.split(data_, y_)):
-        trn_x, trn_y = data_[feats].iloc[trn_idx], y_.iloc[trn_idx]
-        val_x, val_y = data_[feats].iloc[val_idx], y_.iloc[val_idx]
+    for n_fold, (train_idx, valid_idx) in enumerate(folds.split(train_df[feats], train_df['TARGET'])):
+        train_x, train_y = train_df[feats].iloc[train_idx], train_df['TARGET'].iloc[train_idx]
+        valid_x, valid_y = train_df[feats].iloc[valid_idx], train_df['TARGET'].iloc[valid_idx]
 
         clf = LGBMClassifier(
             n_estimators=10000,
@@ -37,17 +51,17 @@ def train_model(data_, test_, y_, folds_, categorical_features_):
             n_jobs=-1,
         )
 
-        clf.fit(trn_x, trn_y,
-                eval_set=[(trn_x, trn_y), (val_x, val_y)],
+        clf.fit(train_x, train_y,
+                eval_set=[(train_x, train_y), (valid_x, valid_y)],
                 eval_metric='auc',
                 verbose=100,
                 early_stopping_rounds=100  # 30
                 )
 
-        oof_preds[val_idx] = clf.predict_proba(val_x,
-                                               num_iteration=clf.best_iteration_)[:, 1]
-        sub_preds += clf.predict_proba(test_[feats],
-                                       num_iteration=clf.best_iteration_)[:, 1] / folds_.n_splits
+        oof_preds[valid_idx] = clf.predict_proba(valid_x,
+                                                 num_iteration=clf.best_iteration_)[:, 1]
+        sub_preds += clf.predict_proba(test_df[feats],
+                                       num_iteration=clf.best_iteration_)[:, 1] / folds.n_splits
 
         fold_importance_df = pd.DataFrame()
         fold_importance_df["feature"] = feats
@@ -55,41 +69,46 @@ def train_model(data_, test_, y_, folds_, categorical_features_):
         fold_importance_df["fold"] = n_fold + 1
         feature_importance_df = pd.concat([feature_importance_df, fold_importance_df], axis=0)
 
-        print('Fold %2d AUC : %.6f' % (n_fold + 1, roc_auc_score(val_y, oof_preds[val_idx])))
-        del clf, trn_x, trn_y, val_x, val_y
+        print('Fold %2d AUC : %.6f' % (n_fold + 1, roc_auc_score(valid_y, oof_preds[valid_idx])))
+        del clf, train_x, train_y, valid_x, valid_y
         gc.collect()
 
-    print('Full AUC score %.6f' % roc_auc_score(y, oof_preds))
+    score = roc_auc_score(train_df['TARGET'], oof_preds)
+    print('Full AUC score %.6f' % score)
 
-    test_['TARGET'] = sub_preds
-
-    df_oof_preds = pd.DataFrame({'SK_ID_CURR':ids, 'TARGET':y, 'PREDICTION':oof_preds})
+    df_oof_preds = pd.DataFrame({'SK_ID_CURR': ids, 'TARGET': train_df['TARGET'], 'PREDICTION': oof_preds})
     df_oof_preds = df_oof_preds[['SK_ID_CURR', 'TARGET', 'PREDICTION']]
 
-    return oof_preds, df_oof_preds, test_[['SK_ID_CURR', 'TARGET']], \
-           feature_importance_df, roc_auc_score(y, oof_preds)
+    if not debug:
+        test_df['TARGET'] = sub_preds
+
+        # Save test predictions
+        now = datetime.now()
+        created_time = now.strftime('%Y-%m-%d-%H-%M')
+        score = str(round(score, 6)).replace('.', '')
+
+        # submission file
+        sub_file = f'../predictions/{created_time}_{score}_{num_folds}_fold-average-LGBClassifier_submission.csv'
+        test_df[['SK_ID_CURR', 'TARGET']].to_csv(sub_file, index=False)
+
+        # oof prediction file
+        oof_file = f'../predictions/{created_time}_{score}_{num_folds}_fold-average-LGBClassifier_oof.csv'
+        df_oof_preds.to_csv(oof_file, index=False)
+
+        # Display a few plots
+        vis_file = f'../visualization/{score}_{created_time}_'
+        folds_idx = [(train_idx, valid_idx) for train_idx, valid_idx in folds.split(train_df[feats], train_df['TARGET'])]
+        display_importances(feature_importance_df_=feature_importance_df,
+                            vis_file=vis_file + "_feature_importances_without_ext_source.png")
+        display_roc_curve(y_=train_df['TARGET'], oof_preds_=oof_preds, folds_idx_=folds_idx,
+                          vis_file=vis_file + "_roc_curve_without_ext_source.png")
+        display_precision_recall(y_=df['TARGET'], oof_preds_=oof_preds, folds_idx_=folds_idx,
+                                 vis_file=vis_file + "_precision_recall_without_ext_source.png")
+
+
+
+    return None
 
 
 if __name__=="__main__":
     gc.enable()
-
-    #Build model inputs
-    data, test, y, ids = build_model_input()
-    categorical_features = [f for f in data.columns if data[f].dtype == 'object']
-    #Creat Folds
-    folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=123)
-    #Train model and get oof and test predictions
-    oof_preds, df_oof_preds, test_preds, importances, score = train_model(data, test, y, folds, categorical_features)
-    # Save test predictions
-    now = datetime.now()
-    score = str(round(score, 6)).replace('.', '')
-    sub_file = '../predictions/without_ext_source_submission_5x-average-LGB-run-01-v1_' + score + '_' + str(now.strftime('%Y-%m-%d-%H-%M')) + '.csv'
-    test_preds.to_csv(sub_file, index=False)
-    oof_file = '../predictions/without_ext_source_train_5x-LGB-run-01-v1-oof_' + score + '_' + str(now.strftime('%Y-%m-%d-%H-%M')) + '.csv'
-    df_oof_preds.to_csv(oof_file, index=False)
-    # Display a few graphs
-    folds_idx = [(trn_idx, val_idx) for trn_idx, val_idx in folds.split(data, y)]
-    vis_file = '../visualization/' + score + '_' + str(now.strftime('%Y-%m-%d-%H-%M'))
-    display_importances(feature_importance_df_=importances, vis_file= vis_file + "_feature_importances_without_ext_source.png")
-    display_roc_curve(y_=y, oof_preds_=oof_preds, folds_idx_=folds_idx, vis_file=vis_file + "_roc_curve_without_ext_source.png")
-    display_precision_recall(y_=y, oof_preds_=oof_preds, folds_idx_=folds_idx, vis_file=vis_file + "_precision_recall_without_ext_source.png")

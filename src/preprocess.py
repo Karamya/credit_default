@@ -6,6 +6,7 @@ from credit_card_balance import get_credit_balance_features
 import gc
 import time
 from contextlib import contextmanager
+from train import kfold_lightgbm
 
 gc.enable()
 
@@ -28,7 +29,7 @@ def application_train_test(num_rows=None, nan_as_category=False):
     df = pd.read_csv("../data/application_train.csv", nrows=num_rows)
     test_df = pd.read_csv("../data/application_test.csv", nrows=num_rows)
     print("Train samples: {}, test samples: {}".format(len(df), len(test_df)))
-    df = df.append(test_df).reset_index()
+    df = df.append(test_df, sort=False).reset_index()
 
     # Optional: Remove 4 applications with XNA CODE_GENDER (train set)
     df = df[df['CODE_GENDER'] != 'XNA']
@@ -85,7 +86,6 @@ def application_train_test(num_rows=None, nan_as_category=False):
 
 
 # Preprocess bureau.csv and bureau_balance.csv
-@timer
 def bureau_and_balance(num_rows=None, nan_as_category=True):
     bureau = pd.read_csv("../data/bureau.csv", nrows=num_rows)
     bb = pd.read_csv("../data/bureau_balance.csv", nrows=num_rows)
@@ -190,7 +190,21 @@ def previous_applications(num_rows=None, nan_as_category=True):
     return prev_agg
 
 
-@timer
+# Preprocess credit_card_balance.csv
+def credit_card_balance(num_rows = None, nan_as_category = True):
+    cc = pd.read_csv('../data/credit_card_balance.csv', nrows = num_rows)
+    cc, cat_cols = one_hot_encoder(cc, nan_as_category= True)
+    # General aggregations
+    cc.drop(['SK_ID_PREV'], axis= 1, inplace = True)
+    cc_agg = cc.groupby('SK_ID_CURR').agg([ 'max', 'mean', 'sum', 'var'])
+    cc_agg.columns = pd.Index(['CC_' + e[0] + "_" + e[1].upper() for e in cc_agg.columns.tolist()])
+    # Count credit card lines
+    cc_agg['CC_COUNT'] = cc.groupby('SK_ID_CURR').size()
+    del cc
+    gc.collect()
+    return cc_agg
+
+
 def pos_cash(num_rows=None, nan_as_category=True):
     pos = pd.read_csv("../data/POS_CASH_balance.csv", nrows=num_rows)
     pos, cat_cols = one_hot_encoder(pos, nan_as_category=True)
@@ -213,7 +227,7 @@ def pos_cash(num_rows=None, nan_as_category=True):
 
 
 def installments_payments(num_rows = None, nan_as_category = True):
-    ins = pd.read_csv('../input/installments_payments.csv', nrows = num_rows)
+    ins = pd.read_csv('../data/installments_payments.csv', nrows = num_rows)
     ins, cat_cols = one_hot_encoder(ins, nan_as_category= True)
     # Percentage and difference paid in each installment (amount paid and installment value)
     ins['PAYMENT_PERC'] = ins['AMT_PAYMENT'] / ins['AMT_INSTALMENT']
@@ -245,78 +259,6 @@ def installments_payments(num_rows = None, nan_as_category = True):
     return ins_agg
 
 
-def build_model_input():
-    """
-
-    :return:
-    """
-
-    print("Reading application train and test data")
-    data = pd.read_csv("../data/application_train.csv")
-    test = pd.read_csv("../data/application_test.csv")
-
-    y = data['TARGET']
-    ids = data['SK_ID_CURR']
-    del data['TARGET']
-
-    categorical_features = [f for f in data.columns if data[f].dtype == 'object']
-    #one-hot encoding of categorical features
-    data = pd.get_dummies(data, columns=categorical_features)
-    test = pd.get_dummies(test, columns=categorical_features)
-
-    del data['CODE_GENDER_XNA'], data['NAME_INCOME_TYPE_Maternity leave'], data['NAME_FAMILY_STATUS_Unknown']
-
-    # correlated_features = ["AMT_GOODS_PRICE", "APARTMENTS_MEDI", "APARTMENTS_MODE",
-    #                        "BASEMENTAREA_MEDI", "BASEMENTAREA_MODE", "COMMONAREA_MEDI",
-    #                        "COMMONAREA_MODE", "ELEVATORS_MEDI", "ELEVATORS_MODE",
-    #                        "ENTRANCES_MEDI", "ENTRANCES_MODE", "FLOORSMAX_MEDI",
-    #                        "FLOORSMAX_MODE", "FLOORSMIN_MEDI", "FLOORSMIN_MODE",
-    #                        "LANDAREA_MEDI", "LANDAREA_MODE", "LIVINGAPARTMENTS_AVG",
-    #                        "LIVINGAPARTMENTS_MEDI", "LIVINGAPARTMENTS_MODE", "LIVINGAREA_AVG",
-    #                        "LIVINGAREA_MEDI", "LIVINGAREA_MODE", "NONLIVINGAPARTMENTS_MEDI",
-    #                        "NONLIVINGAPARTMENTS_MODE", "NONLIVINGAREA_MEDI", "NONLIVINGAREA_MODE",
-    #                        "OBS_60_CNT_SOCIAL_CIRCLE", "REGION_RATING_CLIENT_W_CITY", "TOTALAREA_MODE",
-    #                        "YEARS_BEGINEXPLUATATION_MEDI", "YEARS_BEGINEXPLUATATION_MODE",
-    #                        "YEARS_BUILD_MEDI", "YEARS_BUILD_MODE",
-    #                        # Test data constant values of 0
-    #                        "FLAG_DOCUMENT_10", "FLAG_DOCUMENT_12", "FLAG_DOCUMENT_13",
-    #                        "FLAG_DOCUMENT_14", "FLAG_DOCUMENT_15", "FLAG_DOCUMENT_16",
-    #                        "FLAG_DOCUMENT_17", "FLAG_DOCUMENT_19", "FLAG_DOCUMENT_2",
-    #                        "FLAG_DOCUMENT_20", "FLAG_DOCUMENT_21",
-    #                        ]
-    #
-    # for f_ in correlated_features:
-    #     del data[f_], test[f_]
-
-
-
-    print('Merging all datasets...')
-
-    data = data.merge(right=avg_bureau.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=avg_bureau.reset_index(), how='left', on='SK_ID_CURR')
-
-    data = data.merge(right=avg_prev.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=avg_prev.reset_index(), how='left', on='SK_ID_CURR')
-
-    data = data.merge(right=avg_pos.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=avg_pos.reset_index(), how='left', on='SK_ID_CURR')
-
-    data = data.merge(right=avg_cc_bal.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=avg_cc_bal.reset_index(), how='left', on='SK_ID_CURR')
-
-    data = data.merge(right=avg_inst.reset_index(), how='left', on='SK_ID_CURR')
-    test = test.merge(right=avg_inst.reset_index(), how='left', on='SK_ID_CURR')
-
-    del avg_bureau, avg_prev, avg_pos, avg_cc_bal, avg_inst
-    gc.collect()
-
-    del data['EXT_SOURCE_1'], data['EXT_SOURCE_2'], data['EXT_SOURCE_3']
-    del test['EXT_SOURCE_1'], test['EXT_SOURCE_2'], test['EXT_SOURCE_3']
-    print("Shapes: ", data.shape, test.shape)
-
-    return data, test, y, ids
-
-
 def main(debug=False):
     num_rows = 10000 if debug else None
     df = application_train_test(num_rows)
@@ -345,13 +287,52 @@ def main(debug=False):
         del ins
         gc.collect()
     with timer("Process credit card balance"):
-        cc = credit_card_balance(num_rows)
+        #cc = credit_card_balance(num_rows) #TODO: replace with get_credit_balance_features(num_rows, nan_as_category)
+        cc = get_credit_balance_features(num_rows)
         print("Credit card balance df shape:", cc.shape)
         df = df.join(cc, how='left', on='SK_ID_CURR')
         del cc
         gc.collect()
+    with timer("Run Lightgbm with kfold"):
+        kfold_lightgbm(df, num_folds=5, stratified=False, debug=debug)
 
 
 
 if __name__=="__main__":
-    pos = pos_cash(None)
+    with timer("Full model run"):
+        main()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# correlated_features = ["AMT_GOODS_PRICE", "APARTMENTS_MEDI", "APARTMENTS_MODE",
+#                        "BASEMENTAREA_MEDI", "BASEMENTAREA_MODE", "COMMONAREA_MEDI",
+#                        "COMMONAREA_MODE", "ELEVATORS_MEDI", "ELEVATORS_MODE",
+#                        "ENTRANCES_MEDI", "ENTRANCES_MODE", "FLOORSMAX_MEDI",
+#                        "FLOORSMAX_MODE", "FLOORSMIN_MEDI", "FLOORSMIN_MODE",
+#                        "LANDAREA_MEDI", "LANDAREA_MODE", "LIVINGAPARTMENTS_AVG",
+#                        "LIVINGAPARTMENTS_MEDI", "LIVINGAPARTMENTS_MODE", "LIVINGAREA_AVG",
+#                        "LIVINGAREA_MEDI", "LIVINGAREA_MODE", "NONLIVINGAPARTMENTS_MEDI",
+#                        "NONLIVINGAPARTMENTS_MODE", "NONLIVINGAREA_MEDI", "NONLIVINGAREA_MODE",
+#                        "OBS_60_CNT_SOCIAL_CIRCLE", "REGION_RATING_CLIENT_W_CITY", "TOTALAREA_MODE",
+#                        "YEARS_BEGINEXPLUATATION_MEDI", "YEARS_BEGINEXPLUATATION_MODE",
+#                        "YEARS_BUILD_MEDI", "YEARS_BUILD_MODE",
+#                        # Test data constant values of 0
+#                        "FLAG_DOCUMENT_10", "FLAG_DOCUMENT_12", "FLAG_DOCUMENT_13",
+#                        "FLAG_DOCUMENT_14", "FLAG_DOCUMENT_15", "FLAG_DOCUMENT_16",
+#                        "FLAG_DOCUMENT_17", "FLAG_DOCUMENT_19", "FLAG_DOCUMENT_2",
+#                        "FLAG_DOCUMENT_20", "FLAG_DOCUMENT_21",
+#                        ]
+#
+# for f_ in correlated_features:
+#     del data[f_], test[f_]
